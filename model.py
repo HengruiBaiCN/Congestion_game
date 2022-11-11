@@ -1,7 +1,9 @@
-from typing import List, Set, Dict
-import re, os
-from datetime import datetime
+import os
+import re
 from collections import defaultdict
+from datetime import datetime
+from typing import Dict, List, Set
+
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -16,34 +18,35 @@ class CongestionGame:
         self.edge = defaultdict(list)  # will generate key for dictionary if empty when trying to append
         self.cost = {}  # cost function
         self.num_edge = {}  # number of players on edge
-        self.num_players = 0  # number of players in game
+        self.num_players = None  # number of players in game
 
-        # construct start and end points
-        self.start_node = start_node
-        self.end_node = end_node
+        # construct start and end points for each player
+        self.source = {}
+        self.destination = {}
         self.s_num = None
         
     # set number of players
     def set_player(self, value):
         self.num_players = value
+        for i in range(self.num_players):
+            self.source[i] = None
+            self.destination[i] = None
+            pass
     
     # add node
     def add_node(self, value):
         self.node.add(value)
 
     # set start and end nodes
-    def path(self, start_node, end_node):
-        self.start_node = start_node
-        self.end_node = end_node
+    def add_path(self, player, source, destination):
+        self.source[player] = source
+        self.destination[player] = destination
 
-    # add edge (assumes edges are bi-directional)
-    def add_edge(self, from_node, to_node, cost):
+    # add edge (assumes edges are 1-directional)
+    def add_edge(self, from_node, to_node, linear_rate, flat_rate):
         self.edge[from_node].append(to_node)
-        self.edge[to_node].append(from_node)
-        self.cost[(from_node, to_node)] = cost
-        self.cost[(to_node, from_node)] = cost
+        self.cost[(from_node, to_node)] = linear_rate * self.num_edge + flat_rate
         self.num_edge[(from_node, to_node)] = None
-        self.num_edge[(to_node, from_node)] = None
 
     # find the vertex with minimum cost from source, from the set of
     # vertices not yet included in shortest path tree. Determines which
@@ -146,6 +149,31 @@ class CongestionGame:
 
         return cost_pp, path_pp
 
+def load_game(filename, prob=CongestionGame):
+    '''
+    Loads a roster saved in the specified file.
+    '''
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        print(lines)
+        # index represent the position of the player
+        i = 0
+        # read cost function and travel requirement
+        for line in lines:
+            list_of_line = list(line)
+            # if the start of the line is '(', this is the cost function
+            if list_of_line[0] == '(':
+                prob.add_edge(list_of_line[1], list_of_line[4], list_of_line[8], list_of_line[11])
+                pass
+            #else if the start of the line is 'p', this is a path
+            else:
+                prob.add_path(0, list_of_line[9], list_of_line[12])
+                i += 1
+                pass
+            pass
+        pass
+    pass
+
 def save_nash(roster, dir='.'):
     '''
     Saves the specified roster in the specified directory.  
@@ -158,37 +186,3 @@ def save_nash(roster, dir='.'):
             f.write(line)
             if not line.endswith('\n'):
                 f.write('\n')
-
-def load_game(filename):
-    '''
-    Loads a roster saved in the specified file.
-    '''
-    with open(filename) as f:
-        return f.readlines()
-
-def read_costs(prob=CongestionGame):
-    '''
-      Reads the cost for each nurse, day, and shift from the cost file.  
-      This method first requires you to modify and run `create_costs.py` (you can run that file multiple times).
-      The result is a table that indicates the costs for a nurse to work during a shift.  
-      For instance, Nurse 5 being scheduled to work during day 16 in the Morning shift 
-      induces the cost `read_costs()[5][16%7][SHIFT_MORNING].
-      The cost is only defined for the work shift (in other words, the cost for SHIFT_OFFDUTY is 0).
-    '''
-    cost_list = []
-    with open('costs.rcosts') as f:
-        line = f.readline()
-        cost_list = [ float(f) for f in re.findall('0\.\d*', line)]
-
-    costs = []
-    k = 0
-    for _i in range(prob._nb_nurses):
-        nurse_costs = []
-        for _d in range(DAYS_PER_WEEK):
-            day_costs = {}
-            for shift_type in [SHIFT_AFTERNOON, SHIFT_MORNING, SHIFT_NIGHT]:
-                day_costs[shift_type] = cost_list[k]
-                k += 1
-            nurse_costs.append(day_costs)
-        costs.append(nurse_costs)
-    return costs

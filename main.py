@@ -2,13 +2,17 @@ import model
 import re, os
 
 if __name__ == '__main__':
-    # TODO: Implement Variable Neighbourhood Search
+    # initialise the problem
     prob = model.CongestionGame()
+    # add 4 nodes to the game
+    prob.add_node('A')
+    prob.add_node('B')
+    prob.add_node('C')
+    prob.add_node('D')
+    # set the number of players
+    prob.set_player(2)
     
-
-    
-    file = os.path.basename('D:\u6968198\2022s2\COMP4600\Congestion_game\game.txt')
-    
-    pass
+    # extract information from the input file
+    model.load_game('game.txt', prob)
 
 # eof
