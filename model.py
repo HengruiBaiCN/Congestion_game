@@ -15,174 +15,227 @@ class CongestionGame:
     # initialize
     def __init__(self):
         self.node = set()
-        self.edge = defaultdict(list)  # will generate key for dictionary if empty when trying to append
+        # will generate key for dictionary if empty when trying to append
+        self.edge = defaultdict(list)
         self.cost = {}  # cost function
         self.num_edge = {}  # number of players on edge
-        self.num_players = None  # number of players in game
+        self.num_players = 0  # number of players in game
 
         # construct start and end points for each player
         self.source = {}
         self.destination = {}
-        self.s_num = None
-        
+        self.routes = {}
+        pass
+
     # set number of players
     def set_player(self, value):
         self.num_players = value
         for i in range(self.num_players):
             self.source[i] = None
             self.destination[i] = None
+            self.routes[i] = []
             pass
-    
+
     # add node
     def add_node(self, value):
         self.node.add(value)
+        pass
 
     # set start and end nodes
     def add_path(self, player, source, destination):
         self.source[player] = source
         self.destination[player] = destination
+        pass
 
     # add edge (assumes edges are 1-directional)
     def add_edge(self, from_node, to_node, linear_rate, flat_rate):
         self.edge[from_node].append(to_node)
-        self.cost[(from_node, to_node)] = linear_rate * self.num_edge + flat_rate
-        self.num_edge[(from_node, to_node)] = None
+        self.edge[to_node].append(from_node)
+        self.num_edge[(from_node, to_node)] = 0
+        self.num_edge[(to_node, from_node)] = 0
+        self.cost[(from_node, to_node)] = [float(linear_rate), float(flat_rate)]
+        self.cost[(to_node, from_node)] = [float(linear_rate), float(flat_rate)]
+        pass
 
-    # find the vertex with minimum cost from source, from the set of
-    # vertices not yet included in shortest path tree. Determines which
-    # branch to explore next
-    @staticmethod
-    def __min_cost(cost, node_set):
-        # initialize minimum cost for next node
-        min_cost = float('inf')
-        min_node = None
+    # a recurrsive function to find all possible routes
+    def printAllPathsUtil(self, u, d, visited, path, player):
+        # Mark the current node as visited and store in path
+        visited.append(u)
+        path.append(u)
+        # If current vertex is same as destination, then print
+        if u == d:
+            route = path.copy()
+            self.routes[player].append(route)
+            pass
+        else:
+            # If current vertex is not destination
+            # Recur for all the vertices adjacent to this vertex
+            for i in self.edge[u]:
+                if i not in visited:
+                    self.printAllPathsUtil(i, d, visited, path, player)
+                    pass
+                pass
+            pass
+        # Remove current vertex from path[] and mark it as unvisited
+        path.pop()
+        visited.remove(u)
 
-        # search vertex not in the shortest path tree
-        for u in node_set:
-            if cost[u] < min_cost:
-                min_cost = cost[u]
-                min_node = u
+    # Prints and save all routes of a player
+    def printAllPaths(self, player):
+        s = self.source[player]
+        d = self.destination[player]
+        # Mark all the vertices as not visited and Create an array to store paths
+        visited, path = [], []
+        # Call the recursive helper function to print all paths
+        self.printAllPathsUtil(s, d, visited, path, player)
+        pass
 
-        # return index for minimum vertex
-        return min_node, min_cost
-    
-        # Dijkstra's algorithm
-    def __dijkstra(self):
-        # dynamic node set
-        node_set = set(self.node)
+    # calculate the cost of a route
+    def route_cost_calculation(self, route):
+        cost = 0
+        for i in range(len(route)-1):
+            self.num_edge[(route[i], route[i+1])] += 1
+            edge_cost = self.cost[(route[i], route[i+1])][0] * self.num_edge[(
+                route[i], route[i+1])] + self.cost[(route[i], route[i+1])][1]
+            cost += edge_cost
+            # return to the original value
+            self.num_edge[(route[i], route[i+1])] -= 1
+            pass
+        return cost
 
-        # pre-allocate cost and visit_log
-        cost_log = {}
-        visit_log = {}
-        for node in node_set:
-            cost_log[node] = float('inf')
+    # find a nash equilibrium of the problem
+    def nash(self):
+        # generate all possible routes for each player
+        for player in range(self.num_players):
+            self.printAllPaths(player)
+            pass
 
-        # initialize starting node
-        cost_log[self.start_node] = 0
+        # create a dictionary to save the cost of the route, the route and the status of changing route of a player
+        min_cost = {}
+        min_route = {}
+        flag = {}
+        for player in range(self.num_players):
+            min_cost[player] = 99999999999999999
+            min_route[player] = None
+            flag[player] = True
+            pass
+        
+        # flag for the while loop
+        new_flag = False
 
-        while node_set:
-            # find node with minimum cost
-            min_node, min_cost = self.__min_cost(cost_log, node_set)
+        # find the minimum cost of route of the player
+        while not new_flag:
+            for player in range(self.num_players):
+                # initialise the number of player in each edge to be 0
+                for key in self.num_edge.keys():
+                    self.num_edge[key] = 0
+                    pass
+                # check other player's route to calculate the num of player in each edge
+                for other_player in range(self.num_players):
+                    # if the player has not been given a route yet, skip it
+                    # calculate the number of players in each edge
+                    if min_route[other_player] != None and other_player != player:
+                        for i in range(len(min_route[other_player])-1):
+                            self.num_edge[(
+                                min_route[other_player][i], min_route[other_player][i+1])] += 1
+                            pass
+                        pass
+                    pass
 
-            # remove minimum node from set
-            node_set.remove(min_node)
+                # extract the current number of players in each route and save it, create a flag to keep track on whether the route has been changed or not
+                player_flag = True
+                for route in self.routes[player]:
+                    # calculate the cost of the new route
+                    new_cost = self.route_cost_calculation(route)
+                    last_cost = min_cost[player]
+                    # recalculate the cost of the last route of the player
+                    if min_route[player] != None:
+                        last_cost = self.route_cost_calculation(
+                            min_route[player])
+                        pass
+                    # compare the cost, if the new route has smaller cost, change route, update flag
+                    if new_cost < last_cost:
+                        min_cost[player] = new_cost
+                        min_route[player] = route
+                        player_flag = player_flag & False
+                        pass
+                    # if not, update the flag
+                    else:
+                        player_flag = player_flag & True
+                        pass
+                    pass
+                # check whether the player has changed route or not 
+                flag[player] = player_flag
+                pass
+            # regenerate flag
+            new_flag = True
+            for player in range(self.num_players):
+                new_flag = new_flag & flag[player]
+                pass
+            pass
+        # print(self.routes)
+        return min_route
 
-            # check if we're at end_node
-            if min_node is self.end_node:
-                break
 
-            # loop over neighbors that are still in node_set
-            for neighbor in self.edge[min_node]:
-                if neighbor in node_set:
-                    # +1 to cost to account for current player
-                    alt = min_cost + self.cost[(min_node, neighbor)](self.num_edge[(min_node, neighbor)] + 1)
-
-                    if alt < cost_log[neighbor]:
-                        cost_log[neighbor] = alt
-                        visit_log[neighbor] = min_node
-
-        # re-construct path
-        path = [self.end_node]
-        node = self.end_node
-        while True:
-            # iterate backwards through visit_log
-            node = visit_log[node]
-
-            # insert node to front
-            path.insert(0, node)
-
-            # update number of players on path
-            self.num_edge[(path[0], path[1])] += 1
-            self.num_edge[(path[1], path[0])] += 1
-
-            # exit if at starting node
-            if node is self.start_node:
-                break
-
-        total_cost = cost_log[self.end_node]
-        return path, total_cost
-
-    def nash(self, num_players=None):
-        if num_players is None:
-            num_players = self.num_players
-
-        # reset number of players on edge to 0
-        for key in self.num_edge:
-            self.num_edge[key] = 0
-
-        # compute Nash through sequential dijkstra best response calculations
-        path_pp = []  # path per player
-        for _ in range(num_players):
-            path = self.__dijkstra()[0]
-            path_pp.append(path)
-
-        # sum up cost to each player after all players have played
-        cost_pp = []  # cost per player
-        for path in path_pp:
-            total_cost = 0
-            for idx, node in enumerate(path):
-                if node is not path[-1]:
-                    num_on_edge = self.num_edge[(path[idx], path[idx + 1])]
-                    total_cost += self.cost[(path[idx], path[idx + 1])](num_on_edge)
-                else:
-                    cost_pp.append(total_cost)
-
-        return cost_pp, path_pp
-
-def load_game(filename, prob=CongestionGame):
+def load_game(filename, prob=CongestionGame()):
     '''
     Loads a roster saved in the specified file.
     '''
     with open(filename, 'r') as f:
         lines = f.readlines()
-        print(lines)
         # index represent the position of the player
         i = 0
         # read cost function and travel requirement
         for line in lines:
-            list_of_line = list(line)
-            # if the start of the line is '(', this is the cost function
-            if list_of_line[0] == '(':
-                prob.add_edge(list_of_line[1], list_of_line[4], list_of_line[8], list_of_line[11])
+            list_of_line = line.strip().split(' ')
+            # if the length of the line is 4, this is the cost function
+            if len(list_of_line) == 4:
+                from_node = ''.join(list(list_of_line[0])[1])
+                to_node = ''.join(list(list_of_line[1])[0])
+                linear = ''.join(list(list_of_line[2])[0:-1])
+                flat = ''.join(list(list_of_line[3])[0:-1])
+                prob.add_edge(
+                    from_node, to_node, linear, flat)
                 pass
-            #else if the start of the line is 'p', this is a path
+            # else this is a path
             else:
-                prob.add_path(0, list_of_line[9], list_of_line[12])
+                prob.add_path(i, list_of_line[1][0], list_of_line[2][0])
                 i += 1
                 pass
             pass
         pass
     pass
 
-def save_nash(roster, dir='.'):
+
+def print_nash(prob=CongestionGame(), dir='.'):
     '''
-    Saves the specified roster in the specified directory.  
+    Saves the specified roster in the specified directory.
     The filename is the time when the roster is saved.
     '''
-    # Create a file based on the current time
-    filename = os.path.join(dir,re.subn(':|-','_',str(datetime.now()))[0] + ".rost")
-    with open(filename,'w') as f:
-        for line in roster:
-            f.write(line)
-            if not line.endswith('\n'):
-                f.write('\n')
+    final_route = prob.nash()
+    final_cost = {}
+    # initialise the number of player in each edge to be 0
+    for key in prob.num_edge.keys():
+        prob.num_edge[key] = 0
+        pass
+    # calculate the number of players in each edge
+    for player in range(prob.num_players):
+        for i in range(len(final_route[player])-1):
+            prob.num_edge[(final_route[player][i], final_route[player][i+1])] += 1
+            pass
+        final_cost[player] = 0
+        pass
+    # calculate the cost of the route
+    for player in range(prob.num_players):
+        for i in range(len(final_route[player])-1):
+            edge_cost = prob.cost[(final_route[player][i], final_route[player][i+1])][0] * prob.num_edge[(
+                final_route[player][i], final_route[player][i+1])] + prob.cost[(final_route[player][i], final_route[player][i+1])][1]
+            final_cost[player] += edge_cost
+            pass
+        pass
+    # print the nash equilibrium
+    for player in range(prob.num_players):
+        print(f"player{player+1}, Cost = {final_cost[player]}: {final_route[player]}")
+        pass
+    
+    
