@@ -3,7 +3,7 @@
 
 # Steps:
 - The first step is extract all the information from the input file `load_game`
-  - to make sure the function can precisely extract all the information, the function uses the string `split` method and `strp` method.
+  - to make sure the function can precisely extract all the information, the function uses the string `split` method and `strip` method.
 - The second step is generate all possible paths for each player and its travel requirments
   - this is acheived by a simple recurrsive function `printAllPathsUtil`
 - The third step is calculate a nash equilibrium, below is the general idea of the function
