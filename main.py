@@ -14,5 +14,5 @@ if __name__ == '__main__':
     
     # extract information from the input file
     model.load_game('game.txt', prob)
-
-# eof
+    
+    model.print_nash(prob)
